@@ -37,6 +37,12 @@ final class RevealCoordinator {
 
         hoverMonitor.onReveal = { [weak self] in self?.reveal() }
         hoverMonitor.onCollapse = { [weak self] in self?.collapse() }
+        // The open tray extends the hover region so the pointer can travel
+        // from the bar down into it without the reveal session collapsing.
+        hoverMonitor.extendedRegionProvider = { [weak self] in
+            guard let self, self.tray.isVisible else { return [] }
+            return [self.tray.frame]
+        }
         hoverMonitor.start()
 
         observeWorkspaceNotifications()

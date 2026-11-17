@@ -7,7 +7,11 @@ final class HoverMonitor {
     var revealDelay: TimeInterval = 0.12
 
     /// How long the pointer must stay away before collapsing (seconds).
-    var collapseDelay: TimeInterval = 0.5
+    var collapseDelay: TimeInterval = 1.0
+
+    /// Extra regions (the open tray, in screen coordinates) that keep an
+    /// active reveal session alive while the pointer travels to them.
+    var extendedRegionProvider: (() -> [CGRect])?
 
     /// Fired once per settled hover-in.
     var onReveal: (() -> Void)?
@@ -68,12 +72,14 @@ final class HoverMonitor {
     }
 
     private func currentRegions() -> [CGRect] {
-        NSScreen.screens.map { screen in
+        var regions = NSScreen.screens.map { screen in
             MenuBarRegion.menuBarRect(
                 forScreenFrame: screen.frame,
                 barHeight: MenuBarRegion.barHeight(statusBarThickness: NSStatusBar.system.thickness)
             )
         }
+        regions += extendedRegionProvider?() ?? []
+        return regions
     }
 
     private func handleMouseActivity() {
