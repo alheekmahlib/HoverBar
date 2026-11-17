@@ -1,0 +1,57 @@
+name: HoverBar
+options:
+  bundleIdPrefix: com.hawazensameer
+  deploymentTarget:
+    macOS: "14.0"
+  createIntermediateGroups: true
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    CODE_SIGN_IDENTITY: "-"
+    CODE_SIGN_STYLE: Manual
+    ENABLE_HARDENED_RUNTIME: "NO"
+targets:
+  HoverBar:
+    type: application
+    platform: macOS
+    sources:
+      - HoverBar
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.hawazensameer.hoverbar
+        GENERATE_INFOPLIST_FILE: "NO"
+        INFOPLIST_FILE: HoverBar/Info.plist
+    info:
+      path: HoverBar/Info.plist
+      properties:
+        CFBundleDisplayName: HoverBar
+        CFBundleName: HoverBar
+        CFBundleShortVersionString: "0.0.1"
+        CFBundleVersion: "1"
+        LSUIElement: true
+        LSMinimumSystemVersion: "14.0"
+        NSHumanReadableCopyright: "Copyright © 2026 Hawazen Sameer — MIT License"
+        NSPrincipalClass: NSApplication
+  HoverBarTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - HoverBarTests
+    dependencies:
+      - target: HoverBar
+    settings:
+      base:
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/HoverBar.app/Contents/MacOS/HoverBar"
+        BUNDLE_LOADER: "$(TEST_HOST)"
+        GENERATE_INFOPLIST_FILE: "YES"
+schemes:
+  HoverBar:
+    build:
+      targets:
+        HoverBar: all
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets:
+        - HoverBarTests

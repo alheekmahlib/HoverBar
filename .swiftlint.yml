@@ -1,0 +1,13 @@
+included:
+  - HoverBar
+  - HoverBarTests
+line_length:
+  warning: 140
+  error: 180
+identifier_name:
+  min_length: 2
+  excluded:
+    - x
+    - y
+type_body_length: 300
+file_length: 400
