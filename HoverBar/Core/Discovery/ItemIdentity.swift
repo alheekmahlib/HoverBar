@@ -9,11 +9,6 @@ struct ItemIdentity: Equatable, Hashable, Codable {
     let ownerBundleID: String
     let title: String
 
-    init(ownerBundleID: String, title: String) {
-        self.ownerBundleID = ownerBundleID
-        self.title = title
-    }
-
     /// Fallback identity for a window whose title cannot be read.
     static func fallback(ownerBundleID: String, windowID: UInt32) -> ItemIdentity {
         ItemIdentity(ownerBundleID: ownerBundleID, title: "window-\(windowID)")
@@ -80,31 +75,26 @@ enum SystemModules {
         "time machine", "timemachine", "audiovideomodule", "facetime", "sound",
     ]
 
+    /// Friendly display titles for known system modules (prefix variants).
+    static let displayTitles: [String: String] = [
+        "WiFi": "Wi-Fi",
+        "Wi-Fi": "Wi-Fi",
+        "FocusModes": "Focus",
+        "MusicRecognition": "Music Recognition",
+        "KeyboardBrightness": "Keyboard Brightness",
+        "ScreenMirroring": "Screen Mirroring",
+        "StageManager": "Stage Manager",
+        "AccessibilityShortcuts": "Accessibility Shortcuts",
+        "UserSwitcher": "Fast User Switching",
+        "Now Playing": "Now Playing",
+        "NowPlaying": "Now Playing",
+    ]
+
     /// Friendly display title for a system module, nil for anything else.
     static func displayTitle(for title: String) -> String? {
-        switch title {
-        case _ where title.hasPrefix("BentoBox"):
+        if title.hasPrefix("BentoBox") {
             return "Control Center"
-        case "WiFi", "Wi-Fi":
-            return "Wi-Fi"
-        case "FocusModes":
-            return "Focus"
-        case "MusicRecognition":
-            return "Music Recognition"
-        case "KeyboardBrightness":
-            return "Keyboard Brightness"
-        case "ScreenMirroring":
-            return "Screen Mirroring"
-        case "StageManager":
-            return "Stage Manager"
-        case "AccessibilityShortcuts":
-            return "Accessibility Shortcuts"
-        case "UserSwitcher":
-            return "Fast User Switching"
-        case "Now Playing":
-            return "Now Playing"
-        default:
-            return nil
         }
+        return displayTitles[title]
     }
 }

@@ -91,6 +91,7 @@ final class VisibilityControllerTests: XCTestCase {
         mover.scanner = scanner
         mover.registry = registry
         controller = VisibilityController(scanner: scanner, mover: mover, policy: VisibilityPolicy())
+        controller.coveredBoundary = 600
         controller.elementResolver = { [registry] item in
             registry.element(for: item.identity.title)
         }
@@ -116,8 +117,8 @@ final class VisibilityControllerTests: XCTestCase {
         XCTAssertEqual(controller.hiddenItems.count, 3)
         XCTAssertEqual(mover.calls.count, 3)
 
-        // Sequential offscreen slots.
-        XCTAssertEqual(mover.calls.map(\.x), [-400, -500, -600])
+        // Sequential slots beneath the cover.
+        XCTAssertEqual(mover.calls.map(\.x), [30, 90, 150])
     }
 
     func testRejectedMovesMarkItemsUnsupportedAndStayVisible() {

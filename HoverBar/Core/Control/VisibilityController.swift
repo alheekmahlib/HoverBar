@@ -54,7 +54,9 @@ final class TrackedItem {
 
     func update(info newInfo: MenuBarItem) {
         info = newInfo
-        if !isHidden, newInfo.isOnScreen {
+        // Never let mid-hide repositions (parked under the cover) clobber the
+        // frame the item should be restored to.
+        if !isHidden, !hidingAttempted, newInfo.isOnScreen {
             originalFrame = newInfo.frame
         }
     }
@@ -206,15 +208,20 @@ final class VisibilityController {
         rescan()
         var summary = MoveSummary()
         var slotIndex = 0
-        var attempts: [TrackedItem] = []
 
         while true {
             guard let next = tracked.first(where: { candidate in
-                !candidate.moveFailed
-                    && candidate.info.isOnScreen
+                if candidate.moveFailed {
+                    return false
+                }
+                if candidate.isHidden {
+                    // Hidden items are re-eligible only when they escaped back
+                    // into the visible area.
+                    return candidate.info.isOnScreen && candidate.info.frame.minX >= coveredBoundary
+                }
+                return candidate.info.isOnScreen
                     && candidate.info.frame.minX >= 0
                     && policy.shouldHide(candidate.info)
-                    && (!candidate.isHidden || candidate.info.isOnScreen)
             }) else {
                 break
             }
@@ -223,16 +230,14 @@ final class VisibilityController {
                 windowID != 0 ? snapshotStore.snapshot(windowID: windowID) : nil
             }
             next.beginHideAttempt()
-            attempts.append(next)
 
             // Park items beneath the cover window (Ice-style), from the left
             // edge rightward; ~60px per slot keeps windows from overlapping.
             let targetX: CGFloat = 30 + CGFloat(slotIndex) * 60
             slotIndex += 1
+
             for _ in 0..<3 {
                 if let element = next.axButton {
-                    // Try a direct AX position write first — works for labeled
-                    // system items and (observed) some hosted items.
                     _ = mover.move(element, to: CGPoint(x: targetX, y: next.info.frame.minY))
                 }
                 _ = dragger.drag(
@@ -244,14 +249,12 @@ final class VisibilityController {
                 )
                 Thread.sleep(forTimeInterval: 0.12)
                 rescan()
-                let gone = next.info.frame.minX < coveredBoundary || !next.info.isOnScreen
-                if gone {
+                if next.info.frame.minX < coveredBoundary || !next.info.isOnScreen {
                     break
                 }
             }
 
-            let parked = next.info.frame.minX < coveredBoundary
-            if parked || next.info.frame.minX < 0 || !next.info.isOnScreen {
+            if next.info.frame.minX < coveredBoundary || next.info.frame.minX < 0 || !next.info.isOnScreen {
                 next.markHidden()
                 summary.moved += 1
             } else {

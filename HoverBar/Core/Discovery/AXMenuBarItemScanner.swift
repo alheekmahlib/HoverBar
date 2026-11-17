@@ -29,27 +29,49 @@ final class AXMenuBarItemScanner: ScansItems {
     }
 
     private func items(inHost pid: pid_t, cgItems: [MenuBarItem]) -> [MenuBarItem] {
+        guard let (_, axItems) = Self.menuBarItems(inHost: pid) else {
+            return cgItems
+        }
+        let bundleID = Self.bundleIdentifier(pid: pid)
+        let host = Host(bundleID: bundleID, owner: Self.owner(pid: pid, bundleID: bundleID), pid: pid)
+
+        var matched = Set<CGWindowID>()
+        var found = Self.labeledItems(axItems: axItems, cgItems: cgItems, host: host, matched: &matched)
+
+        var remaining = cgItems.filter { !matched.contains($0.windowID) }
+        found.append(contentsOf: Self.unlabeledItems(axItems: axItems, remaining: &remaining, host: host))
+        found.append(contentsOf: remaining.map { window in
+            Self.makeItem(element: nil, label: nil, frame: window.frame, windowID: window.windowID, host: host)
+        })
+        return found
+    }
+
+    /// The AXMenuBar element and its AXMenuBarItem children in a host process.
+    private static func menuBarItems(inHost pid: pid_t) -> (AXUIElement, [AXUIElement])? {
         let app = AXUIElementCreateApplication(pid)
         var childrenRef: CFTypeRef?
         guard AXUIElementCopyAttributeValue(app, kAXChildrenAttribute as CFString, &childrenRef) == .success,
-              let children = childrenRef as? [AXUIElement] else {
-            return cgItems
-        }
-        guard let menuBar = children.first(where: { AXHelpers.role(of: $0) == "AXMenuBar" }) else {
-            return cgItems
+              let children = childrenRef as? [AXUIElement],
+              let menuBar = children.first(where: { AXHelpers.role(of: $0) == "AXMenuBar" }) else {
+            return nil
         }
         var itemsRef: CFTypeRef?
         guard AXUIElementCopyAttributeValue(menuBar, kAXChildrenAttribute as CFString, &itemsRef) == .success,
               let axItems = itemsRef as? [AXUIElement] else {
-            return cgItems
+            return nil
         }
+        return (menuBar, axItems)
+    }
 
-        let bundleID = Self.bundleIdentifier(pid: pid)
-        let owner = Self.owner(pid: pid, bundleID: bundleID)
-        var matchedWindowIDs = Set<CGWindowID>()
+    /// Pass 1: labeled AX items matched to their CG window by position.
+    private static func labeledItems(
+        axItems: [AXUIElement],
+        cgItems: [MenuBarItem],
+        host: Host,
+        matched: inout Set<CGWindowID>
+    ) -> [MenuBarItem] {
+        let pid = host.pid
         var found: [MenuBarItem] = []
-
-        // Pass 1: labeled AX items match their CG window by position.
         for element in axItems {
             let label = AXHelpers.label(of: element)
             guard let label, !label.isEmpty,
@@ -58,85 +80,69 @@ final class AXMenuBarItemScanner: ScansItems {
                 continue
             }
             let window = cgItems.first {
-                $0.ownerPID == pid && !matchedWindowIDs.contains($0.windowID)
+                $0.ownerPID == pid && !matched.contains($0.windowID)
                     && abs($0.frame.minX - frame.minX) < 14
             }
             if let window {
-                matchedWindowIDs.insert(window.windowID)
+                matched.insert(window.windowID)
             }
-            found.append(makeItem(
-                element: element,
-                label: label,
-                frame: frame,
-                windowID: window?.windowID ?? 0,
-                bundleID: bundleID,
-                owner: owner,
-                pid: pid
-            ))
-        }
-
-        // Pass 2: unlabeled/degenerate AX items (hosted third-party NSStatusItems)
-        // adopt the remaining CG windows in visual order.
-        var remainingWindows = cgItems.filter { !matchedWindowIDs.contains($0.windowID) }
-        let unlabeled = axItems.filter { element in
-            guard let frame = AXHelpers.frame(of: element) else { return false }
-            let label = AXHelpers.label(of: element)
-            return label?.isEmpty != false || frame.width < 2 || frame.height < 2
-        }
-        for element in unlabeled {
-            guard let window = remainingWindows.first else { continue }
-            remainingWindows.removeFirst()
-            found.append(makeItem(
-                element: element,
-                label: nil,
-                frame: window.frame,
-                windowID: window.windowID,
-                bundleID: bundleID,
-                owner: owner,
-                pid: pid
-            ))
-        }
-
-        // Pass 3: CG windows with no AX representation at all.
-        for window in remainingWindows {
-            found.append(makeItem(
-                element: nil,
-                label: nil,
-                frame: window.frame,
-                windowID: window.windowID,
-                bundleID: bundleID,
-                owner: owner,
-                pid: pid
-            ))
+            found.append(makeItem(element: element, label: label, frame: frame, windowID: window?.windowID ?? 0, host: host))
         }
         return found
     }
 
-    private func makeItem(
+    /// Pass 2: unlabeled/degenerate AX items (hosted third-party) adopt the
+    /// remaining CG windows in visual order.
+    private static func unlabeledItems(
+        axItems: [AXUIElement],
+        remaining: inout [MenuBarItem],
+        host: Host
+    ) -> [MenuBarItem] {
+        var found: [MenuBarItem] = []
+        for element in axItems {
+            let label = AXHelpers.label(of: element)
+            let frame = AXHelpers.frame(of: element)
+            let unlabeled = label?.isEmpty != false || (frame?.width ?? 0) < 2 || (frame?.height ?? 0) < 2
+            guard unlabeled, let window = remaining.first else {
+                continue
+            }
+            remaining.removeFirst()
+            found.append(makeItem(element: element, label: nil, frame: window.frame, windowID: window.windowID, host: host))
+        }
+        return found
+    }
+
+    /// Shared facts about one hosting process.
+    private struct Host {
+        let bundleID: String
+        let owner: MenuBarItemOwner
+        let pid: pid_t
+    }
+
+    /// Builds one item from merged AX/CG facts.
+    private static func makeItem(
         element: AXUIElement?,
         label: String?,
         frame: CGRect,
         windowID: CGWindowID,
-        bundleID: String,
-        owner: MenuBarItemOwner,
-        pid: pid_t
+        host: Host
     ) -> MenuBarItem {
         let identity: ItemIdentity
         if let label, !label.isEmpty {
-            identity = ItemIdentity(ownerBundleID: bundleID, title: label)
+            identity = ItemIdentity(ownerBundleID: host.bundleID, title: label)
         } else if windowID != 0 {
-            identity = ItemIdentity.fallback(ownerBundleID: bundleID, windowID: UInt32(windowID))
+            identity = ItemIdentity.fallback(ownerBundleID: host.bundleID, windowID: UInt32(windowID))
         } else {
-            identity = ItemIdentity(ownerBundleID: bundleID, title: "detached")
+            identity = ItemIdentity(ownerBundleID: host.bundleID, title: "detached")
         }
         return MenuBarItem(
             identity: identity,
-            owner: owner,
-            ownerPID: pid,
+            owner: host.owner,
+            ownerPID: host.pid,
             windowID: windowID,
             frame: frame,
             isOnScreen: frame.minX >= 0,
-            displayName: label?.nilIfEmpty ?? bundleID,
+            displayName: label?.nilIfEmpty ?? host.bundleID,
             element: element
         )
     }
