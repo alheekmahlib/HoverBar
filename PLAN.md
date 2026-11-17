@@ -145,10 +145,10 @@ HoverBar/
 
 ### Phase 1 — MVP: اكتشاف + إخفاء + إظهار بلا حركة (2–4 أيام)
 **الهدف:** إثبات الجدوى التقنية كاملة على جهاز حقيقي.
-- [ ] دراسة كود Ice: ملفات البحث عن العناصر والتحريك (اقتبس بحرية مع إسناد في README — Ice رخصة MIT؛ **لا تنسخ أي كود GPL من Dozer**)
-- [ ] `MenuBarItemScanner`: فحص SystemUIServer + ControlCenter، طباعة قائمة الأيقونات (اسم/title + frame + owner) في الـ log
-- [ ] `ItemMover`: تحريك عنصر واحد يدوياً (اختبار: أخفِ أيقونة ثم أعد إظهارها)
-- [ ] `LayoutEngine` + `VisibilityController`: إخفاء كل شيء إلا القائمة الافتراضية المثبتة (Apple menu + عناصر النظام + أيقونة إعدادات HoverBar نفسها)
+- [x] دراسة كود Ice: ملفات البحث عن العناصر والتحريك (اقتبس بحرية مع إسناد في README — Ice رخصة MIT؛ **لا تنسخ أي كود GPL من Dozer**)
+- [x] `MenuBarItemScanner`: فحص مزدوج (CG + AX عبر `AXMenuBarItemScanner`) مع طباعة كاملة في الـ log — *تحديث: على macOS 26/27 كل العناصر مستضافة في ControlCenter*
+- [x] `ItemMover`: مُثبت على الجهاز — AX موضع مباشر للعناصر الموسومة + **نافذة الغطاء (Ice-style) + سحب CGEvent** للمستضافة (انظر Docs/ARCHITECTURE.md §2)
+- [x] `LayoutEngine` + `VisibilityController`: إخفاء العناصر المؤهلة مع تحقق بالفحص — *دورة إخفاء كاملة نجحت على الجهاز؛ موثوقية التمرير الكامل قيد الضبط* (Apple menu + عناصر النظام + أيقونة إعدادات HoverBar نفسها)
 - [ ] `HoverMonitor` + `MenuBarRegion` + `RevealStateMachine` (بدون debounce متقدم): hover فوق الشريط → ظهور الشريط العائم بلقطات ثابتة (بلا حركة)، مغادرة → اختفاء. نقر أيقونة عبر `ClickProxy` (AXPress أولاً)
 - [ ] معالجة فشل AX لعناصر محمية (تبقى ظاهرة)
 - [ ] كتابة `Docs/ARCHITECTURE.md` بما تعلمته (خاصة: عناصر macOS التي لم تنجح معك)
