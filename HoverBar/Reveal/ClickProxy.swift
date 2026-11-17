@@ -9,9 +9,11 @@ import CoreGraphics
 /// and leave re-hiding to the next collapse pass.
 final class ClickProxy {
     private let mover: MovesItems
+    private let dragger: DragsItems
 
-    init(mover: MovesItems = AXItemMover()) {
+    init(mover: MovesItems = AXItemMover(), dragger: DragsItems = CGEventItemDragger()) {
         self.mover = mover
+        self.dragger = dragger
     }
 
     enum Outcome: Equatable, CustomStringConvertible {
@@ -49,13 +51,37 @@ final class ClickProxy {
             Log.reveal.error("click proxy: no element for \(item.info.displayName, privacy: .public)")
             return .failed
         }
-        guard mover.move(element, to: staged.origin) else {
-            Log.reveal.error("click proxy: staging move rejected for \(item.info.displayName, privacy: .public)")
-            return .failed
+        var stagedX = staged.minX
+        if !mover.move(element, to: staged.origin) {
+            // AX write rejected (hosted item) — stage with a synthesized drag.
+            guard item.info.windowID != 0, let dragger = dragger as? CGEventItemDragger else {
+                Log.reveal.error("click proxy: no staging path for \(item.info.displayName, privacy: .public)")
+                return .failed
+            }
+            guard dragger.drag(
+                windowID: item.info.windowID,
+                ownerPID: item.info.ownerPID,
+                from: item.info.frame,
+                toLeftX: staged.minX,
+                barMidY: staged.midY
+            ) else {
+                Log.reveal.error("click proxy: staging drag rejected for \(item.info.displayName, privacy: .public)")
+                return .failed
+            }
         }
-        Thread.sleep(forTimeInterval: 0.08)
+        Thread.sleep(forTimeInterval: 0.12)
+        stagedX += item.info.frame.width / 2
         if AXHelpers.press(element) {
             Log.reveal.info("staged and pressed \(item.info.displayName, privacy: .public)")
+            return .pressedAfterStaging
+        }
+        if let dragger = dragger as? CGEventItemDragger, item.info.windowID != 0 {
+            dragger.click(
+                windowID: item.info.windowID,
+                ownerPID: item.info.ownerPID,
+                at: CGPoint(x: stagedX, y: staged.midY)
+            )
+            Log.reveal.info("staged and clicked \(item.info.displayName, privacy: .public)")
             return .pressedAfterStaging
         }
         Log.reveal.error("click proxy: press failed for \(item.info.displayName, privacy: .public)")

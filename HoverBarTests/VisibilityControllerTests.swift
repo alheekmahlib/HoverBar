@@ -133,11 +133,11 @@ final class VisibilityControllerTests: XCTestCase {
         XCTAssertTrue(controller.hiddenItems.isEmpty)
         XCTAssertTrue(mover.calls.isEmpty)
 
-        // Failed items are never retried.
+        // Failures reset between passes: a healthy retry succeeds.
         mover.failAll = false
         let retry = controller.applyHiddenState()
-        XCTAssertEqual(retry.moved, 0)
-        XCTAssertTrue(mover.calls.isEmpty)
+        XCTAssertEqual(retry.moved, 3)
+        XCTAssertEqual(mover.calls.count, 3)
     }
 
     func testRestoreAllReturnsItemsToOriginalFrames() {

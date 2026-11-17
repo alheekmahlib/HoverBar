@@ -81,6 +81,10 @@ final class TrackedItem {
         isHidden = false
     }
 
+    func resetMoveFailure() {
+        moveFailed = false
+    }
+
     func storeSnapshot(_ provider: @escaping () -> NSImage?) {
         snapshotProvider = provider
     }
@@ -169,9 +173,18 @@ final class VisibilityController {
     /// Scans the window list and merges results into tracked items.
     /// Items that are currently hidden and whose window vanished (parked
     /// offscreen by a drag) are kept in the tracked list.
+    /// Scans whose item count collapses this much are treated as transient
+    /// failures (AX hiccups while ControlCenter reorders) and ignored.
+    private var lastScanCount = 0
+
     @discardableResult
     func rescan() -> [MenuBarItem] {
         let items = scanner.scanAllItems()
+        if items.count == 0 || (lastScanCount > 4 && items.count < lastScanCount / 2) {
+            DiagnosticLog.write("scan: transient (\(items.count) vs last \(lastScanCount)) — keeping tracked")
+            return tracked.map(\.info)
+        }
+        lastScanCount = items.count
         var seen = Set<ItemIdentity>()
 
         for item in items {
@@ -206,7 +219,22 @@ final class VisibilityController {
     @discardableResult
     func applyHiddenState() -> MoveSummary {
         rescan()
+        // Give last pass's failures a fresh chance; stickiness applies within
+        // one pass only.
+        tracked.forEach { $0.resetMoveFailure() }
         var summary = MoveSummary()
+
+        // Items the cover window already pushed offscreen count as hidden;
+        // capture their snapshots so the tray can show them.
+        for item in tracked where !item.isHidden && item.info.frame.minX < 0 && policy.shouldHide(item.info) {
+            let windowID = item.info.windowID
+            item.storeSnapshot { [snapshotStore] in
+                windowID != 0 ? snapshotStore.snapshot(windowID: windowID) : nil
+            }
+            item.beginHideAttempt()
+            item.markHidden()
+            summary.moved += 1
+        }
         var slotIndex = 0
 
         while true {
