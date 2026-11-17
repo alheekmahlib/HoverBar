@@ -224,17 +224,7 @@ final class VisibilityController {
         tracked.forEach { $0.resetMoveFailure() }
         var summary = MoveSummary()
 
-        // Items the cover window already pushed offscreen count as hidden;
-        // capture their snapshots so the tray can show them.
-        for item in tracked where !item.isHidden && item.info.frame.minX < 0 && policy.shouldHide(item.info) {
-            let windowID = item.info.windowID
-            item.storeSnapshot { [snapshotStore] in
-                windowID != 0 ? snapshotStore.snapshot(windowID: windowID) : nil
-            }
-            item.beginHideAttempt()
-            item.markHidden()
-            summary.moved += 1
-        }
+        summary.moved += markCoverPushedItemsHidden()
         var slotIndex = 0
 
         while true {
@@ -297,6 +287,23 @@ final class VisibilityController {
         let hiddenNames = tracked.filter(\.isHidden).map(\.identity.title).joined(separator: ", ")
         DiagnosticLog.write("hide-pass: \(summary.logString) hidden=[\(hiddenNames)]")
         return summary
+    }
+
+    /// Items the cover window already pushed offscreen count as hidden;
+    /// captures their snapshots so the tray can show them. Returns how many
+    /// items were newly marked hidden.
+    private func markCoverPushedItemsHidden() -> Int {
+        var newlyHidden = 0
+        for item in tracked where !item.isHidden && item.info.frame.minX < 0 && policy.shouldHide(item.info) {
+            let windowID = item.info.windowID
+            item.storeSnapshot { [snapshotStore] in
+                windowID != 0 ? snapshotStore.snapshot(windowID: windowID) : nil
+            }
+            item.beginHideAttempt()
+            item.markHidden()
+            newlyHidden += 1
+        }
+        return newlyHidden
     }
 
     /// Restores every hidden item to its original frame (used on quit and on
