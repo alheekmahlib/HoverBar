@@ -139,7 +139,7 @@ HoverBar/
 - [x] SwiftLint + إعداد CI: GitHub Actions على `macos-14` يعمل `xcodebuild build` و`test`
 - [x] Issues templates (bug/feature)
 - [ ] Discussions مفعّلة (تتطلب مستودع GitHub)
-- [ ] أول release تجريبي؟ لا — فقط tag `v0.0.1-dev`
+- [x] أول release تجريبي؟ لا — فقط tag `v0.0.1-dev`
 
 **معيار الإنجاز:** CI أخضر على `main` مع build نظيف.
 
