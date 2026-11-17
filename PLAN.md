@@ -136,7 +136,7 @@ HoverBar/
 **الهدف:** مستودع جاهز للتطوير بCI يعمل.
 - [x] إنشاء مشروع Xcode (App، Swift، LSUIElement=true، bundle id مثل `com.<username>.hoverbar`) داخل هذا المستودع
 - [x] LICENSE (MIT باسم صاحب المشروع)، .gitignore (Xcode/Swift/macOS)، README مبدئي (عربي + إنجليزي، وصف الفكرة وصورة placeholder)
-- [x] SwiftLint + إعداد CI: GitHub Actions على `macos-14` يعمل `xcodebuild build` و`test`
+- [x] SwiftLint + إعداد CI: GitHub Actions على `macos-15` (كان macos-14 قبل تقاعده) يعمل `xcodebuild build` و`test`
 - [x] Issues templates (bug/feature)
 - [ ] Discussions مفعّلة (تتطلب مستودع GitHub)
 - [x] أول release تجريبي؟ لا — فقط tag `v0.0.1-dev`
