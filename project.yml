@@ -9,7 +9,6 @@ settings:
     SWIFT_VERSION: "5.0"
     CODE_SIGN_IDENTITY: "-"
     CODE_SIGN_STYLE: Manual
-    ENABLE_HARDENED_RUNTIME: "NO"
 targets:
   HoverBar:
     type: application
