@@ -92,8 +92,9 @@ final class VisibilityControllerTests: XCTestCase {
         mover.registry = registry
         controller = VisibilityController(scanner: scanner, mover: mover, policy: VisibilityPolicy())
         controller.coveredBoundary = 600
-        controller.elementResolver = { [registry] item in
-            registry.element(for: item.identity.title)
+        let strongRegistry = registry
+        controller.elementResolver = { item in
+            strongRegistry?.element(for: item.identity.title)
         }
     }
 
