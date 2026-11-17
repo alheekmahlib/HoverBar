@@ -18,6 +18,7 @@ final class HoverMonitor {
     private var monitors: [Any] = []
     private var revealWork: DispatchWorkItem?
     private var collapseWork: DispatchWorkItem?
+    private var watchdog: Timer?
     private var isRevealed = false
 
     func start() {
@@ -36,23 +37,47 @@ final class HoverMonitor {
         if let localMonitor = NSEvent.addLocalMonitorForEvents(matching: mask, handler: localHandler) {
             monitors.append(localMonitor)
         }
+        // Menus (ours or an app's) swallow exit events while tracking, which
+        // can leave the monitor stuck in "revealed". A default-mode timer only
+        // fires between tracking sessions — exactly the self-heal we need.
+        watchdog = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
+            self?.healIfNeeded()
+        }
     }
 
     func stop() {
         monitors.forEach { NSEvent.removeMonitor($0) }
         monitors.removeAll()
+        watchdog?.invalidate()
         revealWork?.cancel()
         collapseWork?.cancel()
     }
 
-    private func handleMouseActivity() {
-        let regions = NSScreen.screens.map { screen in
+    /// Forces a collapse when the pointer is away but no exit event arrived.
+    private func healIfNeeded() {
+        guard isRevealed else { return }
+        let regions = currentRegions()
+        guard !MenuBarRegion.contains(NSEvent.mouseLocation, inRects: regions) else { return }
+        isRevealed = false
+        revealWork?.cancel()
+        revealWork = nil
+        collapseWork?.cancel()
+        collapseWork = nil
+        onCollapse?()
+        Log.app.debug("hover monitor healed a stuck reveal")
+    }
+
+    private func currentRegions() -> [CGRect] {
+        NSScreen.screens.map { screen in
             MenuBarRegion.menuBarRect(
                 forScreenFrame: screen.frame,
                 barHeight: MenuBarRegion.barHeight(statusBarThickness: NSStatusBar.system.thickness)
             )
         }
-        let inside = MenuBarRegion.contains(NSEvent.mouseLocation, inRects: regions)
+    }
+
+    private func handleMouseActivity() {
+        let inside = MenuBarRegion.contains(NSEvent.mouseLocation, inRects: currentRegions())
 
         if inside {
             collapseWork?.cancel()
